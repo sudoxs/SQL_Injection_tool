@@ -1,147 +1,129 @@
 
-# SQL_Injection_tool
+# SQL Injection Testing Toolkit
 
-A hands-on SQL injection testing toolkit for web application security assessments. Built for researchers and penetration testers who need granular control over their payloads.
+A Python-based toolkit for authorized SQL injection testing and web application security research.
 
----
+This project was developed to explore and automate repetitive SQL injection testing workflows while keeping the testing process configurable and understandable.
 
-## English
+## Features
 
-### What this is
+### Input Handling
 
-This started as a personal project to automate repetitive SQLi testing workflows without relying on heavy frameworks. It grew into something more flexible — a modular tool that lets you craft, obfuscate, and fire payloads at different injection points (URL params, POST data, cookies, headers) while keeping you in the loop for every request.
+- URL parameter testing
+- POST form input testing
+- Cookie and HTTP header testing
+- Automatic form discovery where supported
 
-### Key stuff it does
+### SQL Injection Testing
 
-- **Multi-vector targeting** — Test URL parameters, POST fields (auto-detected forms), cookies, or headers
-- **Blind SQLi automation** — Boolean-based, error-based, and time-based detection with configurable thresholds
-- **UNION helper** — Column counting, data type probing, version fingerprinting
-- **Payload obfuscation** — Built-in encoder supporting case randomization, inline comments, hex/char encoding, string splitting, and multi-layer encoding (URL, base64, unicode)
-- **Target management** — Save frequently tested URLs with labels and notes in a local JSON file
-- **Browser integration** — Optional Playwright support to open suspicious responses in Chromium for manual inspection
-- **Modular payloads** — Load custom payload dictionaries from external Python files
+- Boolean-based testing workflows
+- Error-based detection
+- Time-based detection
+- UNION-related testing helpers
+- Column counting and data type probing
+- Database version-related checks
 
-### Quick start
+### Payload Processing
 
-```bash
-git clone https://github.com/sudoxs/SQL_Injection_tool.git
-cd SQL_Injection_tool
-pip install requests beautifulsoup4
-# Optional: for browser features
-pip install playwright && playwright install chromium
+- Case variation
+- Inline comment transformations
+- Hexadecimal and character encoding
+- Unicode and entity transformations
+- Alternative keyword representations
+- Configurable encoding layers
 
-python SQLI.py
-```
+### Target Management
 
-### Basic workflow
+- Save frequently used targets locally
+- Store labels and notes
+- Reuse target configurations
 
-1. Set your target URL (or pick from saved targets)
-2. Select injection point type and specific parameters
-3. Choose your attack mode — blind testing, UNION enumeration, or custom payload batch
-4. Review responses (status codes, timing, content hashes) and optionally open in browser
+### Browser Integration
 
-### Payload obfuscation example
+Optional Playwright integration can open selected responses in Chromium for manual inspection.
 
-The tool includes an `Obfuscator` class that can transform simple payloads into WAF-evading variants:
+## Technologies
 
-```
-Input:  ' OR '1'='1' --
-Output variations might include:
-- '/**/OR/**/'1'=CHAR(49)/**/--+ 
-- %27%20%4f%52%20%27%31%27%3d%27%31%27%20%2d%2d%20
-- ' OR '1'='1' /*!50000AND*/ '2'='2' #
-```
+- Python
+- Requests
+- BeautifulSoup
+- Playwright (optional)
 
-### File structure
+## Installation
 
-```
-SQL_Injection_tool/
-├── SQLI.py              # Main interactive tool
-├── targets.json         # Auto-generated target storage
-├── payloads/            # Your custom payload dictionaries
-└── errors/              # Regex patterns for error detection
-```
-
-### Requirements
-
-- Python 3.8+
-- `requests`, `beautifulsoup4`
-- `playwright` (optional, for browser features)
-
----
-
-## 日本語
-
-### これは何？
-
-重いフレームワークに頼らず、SQLインジェクションの繰り返し作業を自動化したいと思って作った個人プロジェクトです。段々と機能を足していって、今ではペイロードの作成から難読化、複数の注入ポイント（URLパラメータ、POSTデータ、Cookie、ヘッダー）への送信まで、細かく制御できるモジュール型ツールになっています。
-
-### 主な機能
-
-- **マルチベクター対応** — URLパラメータ、POSTフィールド（フォーム自動検出）、Cookie、ヘッダーのテスト
-- **ブラインドSQLi自動化** — 真偽値ベース、エラーベース、タイムベースの検出（閾値設定可能）
-- **UNIONヘルパー** — カラム数カウント、データ型判定、バージョン特定
-- **ペイロード難読化** — 大文字小文字ランダム化、インラインコメント、16進数/文字コード変換、文字列分割、多層エンコーディング（URL、base64、unicode）に対応
-- **ターゲット管理** — よくテストするURLをラベルとメモ付きでローカルJSONに保存
-- **ブラウザ連携** — 怪しいレスポンスをChromiumで開いて手動確認（Playwrightオプション）
-- **モジュール型ペイロード** — 外部Pythonファイルからカスタムペイロード辞書を読み込み
-
-### クイックスタート
+Clone the repository:
 
 ```bash
 git clone https://github.com/sudoxs/SQL_Injection_tool.git
 cd SQL_Injection_tool
-pip install requests beautifulsoup4
-# オプション：ブラウザ機能を使う場合
-pip install playwright && playwright install chromium
+```
 
+Install the main dependencies:
+
+```bash
+pip install requests beautifulsoup4
+```
+
+For optional browser integration:
+
+```bash
+pip install playwright
+playwright install chromium
+```
+
+## Usage
+
+Start the interactive application:
+
+```bash
 python SQLI.py
 ```
 
-### 基本的な使い方
+The application provides an interactive workflow for preparing requests, selecting injection points, managing payloads, and reviewing responses.
 
-1. ターゲットURLを設定（または保存済みターゲットから選択）
-2. 注入ポイントのタイプと具体的なパラメータを選択
-3. 攻撃モードを選択 — ブラインドテスト、UNION列挙、カスタムペイロードバッチ
-4. レスポンスを確認（ステータスコード、タイミング、コンテンツハッシュ）して、必要に応じてブラウザで開く
+## Project Structure
 
-### ペイロード難読化の例
-
-ツールに含まれる`Obfuscator`クラスは、単純なペイロードをWAF回避バリアントに変換できます：
-
-```
-入力:  ' OR '1'='1' --
-出力例:
-- '/**/OR/**/'1'=CHAR(49)/**/--+ 
-- %27%20%4f%52%20%27%31%27%3d%27%31%27%20%2d%2d%20
-- ' OR '1'='1' /*!50000AND*/ '2'='2' #
-```
-
-### ファイル構成
-
-```
+```text
 SQL_Injection_tool/
-├── SQLI.py              # メインの対話型ツール
-├── targets.json         # 自動生成されるターゲット保存ファイル
-├── payloads/            # カスタムペイロード辞書
-└── errors/              # エラー検出用正規表現パターン
+│
+├── SQLI.py
+├── targets.json
+├── payloads/
+└── errors/
 ```
 
-### 必要なもの
+`targets.json`, `payloads/`, and `errors/` are used for local target storage and optional custom payload or error-pattern resources.
 
-- Python 3.8以上
-- `requests`、`beautifulsoup4`
-- `playwright`（オプション、ブラウザ機能用）
+## Testing
 
----
+Automated tests are being added to cover deterministic helper functions, input parsing, encoding utilities, and payload-processing behavior.
 
-## Disclaimer / 免責事項
+Run the test suite with:
 
-**English:** This tool is for authorized security testing only. Always obtain proper permission before testing any system you don't own. The author is not responsible for misuse or damage caused by this tool.
-
-**日本語:** 本ツールは許可されたセキュリティテスト専用です。自分が所有していないシステムをテストする前に、必ず適切な許可を得てください。作者は本ツールの誤用やそれによって生じた損害について責任を負いません。
-
----
-
-Built with Python, caffeine, and too many late nights debugging regex patterns.
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
 ```
+
+## Limitations
+
+- SQL injection detection is based on response behavior and configured heuristics.
+- Results require manual validation before being considered confirmed vulnerabilities.
+- Different database engines and application behavior may require different testing approaches.
+- Automated results should not replace manual security analysis.
+
+## Responsible Use
+
+This project is intended for authorized security testing, controlled lab environments, and educational research.
+
+Only test systems that you own or have explicit permission to assess.
+
+The author is not responsible for unauthorized use or damage resulting from misuse of this tool.
+
+## Author
+
+**Shayan Ghasemi**
+
+GitHub: https://github.com/sudoxs
+
+Portfolio: https://sudoxs.github.io/sudoxsweb/
